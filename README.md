@@ -3,16 +3,29 @@
 *这是一个轻量级的基于Open R1复现DeepSeek-R1的项目。主要用于系统的理解和学习DeepSeek-R1整个训练过程*
 
 ## 硬件配置
-我的硬件配置为单卡RTX 3060 12G，以下命令都能成功运行，执行时间为3060的执行时间，仅供参考
+我的硬件配置为单卡RTX 3060 12G，以下命令都能成功运行，执行时间基于我的3060显卡，仅供参考
 
 据说使用unsloth可以运行更大参数的模型，如果大家喜欢的化记得一键三连，我后续分享实践结果
 
 ## 环境配置
-完成环境配置安装
+```shell
+conda create -n light-open-r1 python=3.11 -y
+conda activate light-open-r1
+pip install vllm==0.7.1
+pip install wandb
+pip install flash-attn --no-build-isolation
+pip install -e .
+apt-get install git-lfs
+#按需修改为你的proxy地址，否则无法拉取和推送模型
+export HTTP_PROXY="http://192.168.4.86:4780"
+export HTTPS_PROXY="http://192.168.4.86:4780"
+huggingface-cli login
+wandb login
+```
 
 ## 执行训练
 ```shell
-# 执行SFT训练，执行时间大约445分钟，注意观察显卡温度，不要问我为什么知道的。。
+# 执行SFT训练，执行时间大约445分钟，注意观察显卡温度
 python src/open_r1/sft.py --config recipes/Qwen2.5-0.5B-Instruct-light/grpo/config_demo.yaml
 ```
 
@@ -24,7 +37,7 @@ python src/open_r1/sft.py --config recipes/Qwen2.5-0.5B-Instruct-light/grpo/conf
 
 
 ```shell
-# 执行GRPO训练，时间较长，执行中截图如下，recipes中我已设置为50步保存一次结果
+# 执行GRPO训练，时间较长，执行中截图如下
 python src/open_r1/grpo.py --config recipes/Qwen2.5-0.5B-Instruct-light/grpo/config_demo.yaml
 ```
 <img src="assets/image-2.png" width="1000">
