@@ -47,7 +47,7 @@ python src/open_r1/grpo.py --config recipes/Qwen2.5-0.5B-Instruct-light/grpo/con
 平常工作较忙，抽空更新后续部分
 
 
-以下为原Open R1项目内容2025年2月9日 机翻（可能已过时）
+以下为原Open R1项目内容翻译
 ---
 
 **目录**  
