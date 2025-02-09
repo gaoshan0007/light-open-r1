@@ -25,7 +25,7 @@ wandb login
 
 ## 执行训练
 ```shell
-# 执行SFT训练，执行时间大约445分钟，注意观察显卡温度
+# 执行SFT训练
 python src/open_r1/sft.py --config recipes/Qwen2.5-0.5B-Instruct-light/grpo/config_demo.yaml
 ```
 
