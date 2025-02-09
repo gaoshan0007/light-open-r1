@@ -1,8 +1,6 @@
-# Open R1
+# Light Open R1
 
-
-
-*这是一个轻量级的基于Open R1的DeepSeek-R1复现项目。主要用于系统的理解和学习DeepSeek-R1*
+*这是一个轻量级的基于Open R1复现DeepSeek-R1的项目。主要用于系统的理解和学习DeepSeek-R1整个训练过程*
 
 ## 硬件配置
 我的硬件配置为单卡RTX 3060 12G，以下命令都能成功运行，执行时间为3060的执行时间，仅供参考
@@ -24,11 +22,16 @@ python src/open_r1/sft.py --config recipes/Qwen2.5-0.5B-Instruct-light/grpo/conf
 
 
 
+
 ```shell
 # 执行GRPO训练，时间较长，执行中截图如下，recipes中我已设置为50步保存一次结果
 python src/open_r1/grpo.py --config recipes/Qwen2.5-0.5B-Instruct-light/grpo/config_demo.yaml
 ```
 <img src="assets/image-2.png" width="1000">
+
+
+## 后续
+平常工作较忙，抽空更新后续部分
 
 
 以下为原Open R1项目内容2025年2月9日 机翻（可能已过时）
