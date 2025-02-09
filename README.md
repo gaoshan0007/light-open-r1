@@ -1,95 +1,125 @@
 # Open R1
 
-*A fully open reproduction of DeepSeek-R1. This repo is a work in progress, let's build it together!*
 
-**Table of Contents**  
-1. [Overview](#overview)  
-2. [Plan of attack](#plan-of-attack)  
-3. [Installation](#installation)  
-4. [Training models](#training-models)  
+
+*这是一个轻量级的基于Open R1的DeepSeek-R1复现项目。主要用于系统的理解和学习DeepSeek-R1*
+
+## 硬件配置
+我的硬件配置为单卡RTX 3060 12G，以下命令都能成功运行，执行时间为3060的执行时间，仅供参考
+
+据说使用unsloth可以运行更大参数的模型，如果大家喜欢的化记得一键三连，我后续分享实践结果
+
+## 环境配置
+完成环境配置安装
+
+## 执行训练
+```shell
+# 执行SFT训练，执行时间大约445分钟，注意观察显卡温度，不要问我为什么知道的。。
+python src/open_r1/sft.py --config recipes/Qwen2.5-0.5B-Instruct-light/grpo/config_demo.yaml
+```
+
+
+<img src="assets/image-1.png" width="500">
+<img src="assets/image.png" width="500">
+
+
+
+```shell
+# 执行GRPO训练，时间较长，执行中截图如下，recipes中我已设置为50步保存一次结果
+python src/open_r1/grpo.py --config recipes/Qwen2.5-0.5B-Instruct-light/grpo/config_demo.yaml
+```
+<img src="assets/image-2.png" width="1000">
+
+
+以下为原Open R1项目内容2025年2月9日 机翻（可能已过时）
+---
+
+**目录**  
+1. [概述](#overview)  
+2. [攻击计划](#plan-of-attack)  
+3. [安装](#installation)  
+4. [训练模型](#training-models)  
    - [SFT](#sft)  
    - [GRPO](#grpo)  
-5. [Evaluating models](#evaluating-models)  
-6. [Reproducing Deepseek's evaluation results on MATH-500](#reproducing-deepseeks-evaluation-results-on-math-500)  
-7. [Data generation](#data-generation)  
-   - [Generate data from a smol distilled R1 model](#generate-data-from-a-smol-distilled-r1-model)  
-   - [Generate data from DeepSeek-R1](#generate-data-from-deepseek-r1)  
-8. [Contributing](#contributing)
+5. [评估模型](#evaluating-models)  
+6. [复现Deepseek在MATH-500上的评估结果](#reproducing-deepseeks-evaluation-results-on-math-500)  
+7. [数据生成](#data-generation)  
+   - [从小型蒸馏R1模型生成数据](#generate-data-from-a-smol-distilled-r1-model)  
+   - [从DeepSeek-R1生成数据](#generate-data-from-deepseek-r1)  
+8. [贡献](#contributing)
 
-## Overview
+## 概述
 
-The goal of this repo is to build the missing pieces of the R1 pipeline such that everybody can reproduce and build on top of it. The project is simple by design and mostly consists of:
+这个仓库的目标是构建R1流程中缺失的部分,使得每个人都能复现并在其基础上进行开发。该项目设计简单,主要包含:
 
+- `src/open_r1`: 包含用于训练和评估模型以及生成合成数据的脚本:
+    - `grpo.py`: 在给定数据集上使用GRPO训练模型。
+    - `sft.py`: 在数据集上对模型进行简单的SFT。
+    - `evaluate.py`: 在R1基准测试上评估模型。
+    - `generate.py`: 使用[Distilabel](https://github.com/argilla-io/distilabel)从模型生成合成数据。
+- `Makefile`: 包含利用上述脚本执行R1流程中每个步骤的易用命令。
 
-- `src/open_r1`: contains the scripts to train and evaluate models as well as generate synthetic data:
-    - `grpo.py`: trains a model with GRPO on a given dataset.
-    - `sft.py`: performs a simple SFT of a model on a dataset.
-    - `evaluate.py`: evaluates a model on the R1 benchmarks.
-    - `generate.py`: generates synthetic data from a model using [Distilabel](https://github.com/argilla-io/distilabel).
-- `Makefile`: contains easy-to-run commands for each step in the R1 pipeline leveraging the scripts above.
+### 攻击计划
 
-### Plan of attack
+我们将使用DeepSeek-R1的[技术报告](https://github.com/deepseek-ai/DeepSeek-R1)作为指南,大致可以分为三个主要步骤:
 
-We will use the DeepSeek-R1 [tech report](https://github.com/deepseek-ai/DeepSeek-R1) as a guide, which can roughly be broken down into three main steps:
-
-* Step 1: replicate the R1-Distill models by distilling a high-quality corpus from DeepSeek-R1.
-* Step 2: replicate the pure RL pipeline that DeepSeek used to create R1-Zero. This will likely involve curating new, large-scale datasets for math, reasoning, and code.
-* Step 3: show we can go from base model to RL-tuned via multi-stage training.
+* 步骤1:通过从DeepSeek-R1蒸馏高质量语料库来复现R1-Distill模型。
+* 步骤2:复现DeepSeek用于创建R1-Zero的纯RL流程。这可能需要为数学、推理和代码领域策划新的大规模数据集。
+* 步骤3:展示我们可以通过多阶段训练从基础模型到RL调优。
 
 <center>
     <img src="assets/plan-of-attack.png" width="500">
 </center>
 
 
-## Installation
+## 安装
 
-**Note: Libraries rely on CUDA 12.4. Double check your system if you get segmentation faults.**
+**注意:库依赖于CUDA 12.4。如果遇到段错误,请检查您的系统。**
 
-To run the code in this project, first, create a Python virtual environment using e.g. `uv`.
-To install `uv`, follow the [UV Installation Guide](https://docs.astral.sh/uv/getting-started/installation/).
-
+要运行此项目中的代码,首先使用例如`uv`创建一个Python虚拟环境。
+要安装`uv`,请参照[UV安装指南](https://docs.astral.sh/uv/getting-started/installation/)。
 
 ```shell
 uv venv openr1 --python 3.11 && source openr1/bin/activate && uv pip install --upgrade pip --link-mode=copy
 ```
 
-Next, install vLLM:
+接下来,安装vLLM:
 
 ```shell
 uv pip install vllm==0.7.1 --link-mode=copy
 ```
 
-This will also install PyTorch `v2.5.1` and it is **very important** to use this version since the vLLM binaries are compiled for it. You can then install the remaining dependencies for your specific use case via `pip install -e .[LIST OF MODES]`. For most contributors, we recommend:
+这也会安装PyTorch `v2.5.1`,使用这个版本**非常重要**,因为vLLM的二进制文件是为其编译的。然后,您可以通过`pip install -e .[LIST OF MODES]`为您的特定用例安装其余依赖项。对于大多数贡献者,我们建议:
 
 ```shell
 GIT_LFS_SKIP_SMUDGE=1 uv pip install -e ".[dev]" --link-mode=copy
 ```
 
-Next, log into your Hugging Face and Weights and Biases accounts as follows:
+接下来,按如下方式登录您的Hugging Face和Weights and Biases账户:
 
 ```shell
 huggingface-cli login
 wandb login
 ```
 
-Finally, check whether your system has Git LFS installed so that you can load and push models/datasets to the Hugging Face Hub:
+最后,检查您的系统是否安装了Git LFS,以便您可以加载和推送模型/数据集到Hugging Face Hub:
 
 ```shell
 git-lfs --version
 ```
 
-If it isn't installed, run:
+如果未安装,运行:
 
 ```shell
 sudo apt-get install git-lfs
 ```
 
-## Training models
+## 训练模型
 
-We support training models with either DDP or DeepSpeed (ZeRO-2 and ZeRO-3). For example, to run SFT on a dataset distilled from DeepSeek-R1 with reasoning traces such as [Bespoke-Stratos-17k](https://huggingface.co/datasets/bespokelabs/Bespoke-Stratos-17k), run:
+我们支持使用DDP或DeepSpeed(ZeRO-2和ZeRO-3)训练模型。例如,要在从DeepSeek-R1蒸馏的带有推理痕迹的数据集(如[Bespoke-Stratos-17k](https://huggingface.co/datasets/bespokelabs/Bespoke-Stratos-17k))上运行SFT,执行:
 
 ```shell
-# Train via command line
+# 通过命令行训练
 accelerate launch --config_file=recipes/accelerate_configs/zero3.yaml src/open_r1/sft.py \
     --model_name_or_path Qwen/Qwen2.5-1.5B-Instruct \
     --dataset_name HuggingFaceH4/Bespoke-Stratos-17k \
@@ -103,34 +133,34 @@ accelerate launch --config_file=recipes/accelerate_configs/zero3.yaml src/open_r
     --bf16 \
     --output_dir data/Qwen2.5-1.5B-Open-R1-Distill
 
-# Train via YAML config
+# 通过YAML配置训练
 accelerate launch --config_file recipes/accelerate_configs/zero3.yaml src/open_r1/sft.py \
     recipes/Qwen/Qwen2.5-1.5B-Instruct/sft/config_demo.yaml
 ```
 
-Currently, the following tasks are supported:
+目前支持以下任务:
 
-* Supervised Fine-Tuning `sft`
-* Group Relative Policy Optimization `grpo`
+* 监督微调 `sft`
+* 群组相对策略优化 `grpo`
 
 > [!TIP]
-> If you scale up/down the number of GPUs, we recommend also scaling up the per-device batch size or number of gradient accumulation steps to keep the global batch size constant.
+> 如果您增加/减少GPU数量,我们建议同时调整每设备批量大小或梯度累积步数,以保持全局批量大小不变。
 
-By default, these scripts will push each model to your Hugging Face Hub username, i.e. `{username}/{model_name}-{task}`. You can override the parameters in each YAML config by appending them to the command as follows: 
+默认情况下,这些脚本会将每个模型推送到您的Hugging Face Hub用户名下,即`{username}/{model_name}-{task}`。您可以通过在命令后附加参数来覆盖每个YAML配置中的参数:
 
 ```shell
-# Change batch size, number of epochs etc
+# 更改批量大小、训练轮数等
 accelerate launch --config_file recipes/accelerate_configs/zero3.yaml src/open_r1/sft.py \
     recipes/Qwen/Qwen2.5-1.5B-Instruct/sft/config_demo.yaml
     --per_device_train_batch_size=1 --num_train_epochs=5
 ```
 
 > [!NOTE]
-> The training commands below are configured for a node of 8 x H100s (80GB). For different hardware and topologies, you may need to tune the batch size and number of gradient accumulation steps.
+> 下面的训练命令是为8 x H100s (80GB)的节点配置的。对于不同的硬件和拓扑结构,您可能需要调整批量大小和梯度累积步数。
 
 ### SFT
 
-To run SFT on a dataset distilled from DeepSeek-R1 with reasoning traces such as [Bespoke-Stratos-17k](https://huggingface.co/datasets/bespokelabs/Bespoke-Stratos-17k), run:
+要在从DeepSeek-R1蒸馏的带有推理痕迹的数据集(如[Bespoke-Stratos-17k](https://huggingface.co/datasets/bespokelabs/Bespoke-Stratos-17k))上运行SFT,执行:
 
 ```shell
 ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/zero3.yaml \
@@ -140,7 +170,7 @@ ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_con
 
 ### GRPO
 
-To train via the GRPO trainer, we use one GPU to run vLLM for faster generation and the remaining GPUs for training. For example, one a node with 8 GPUs, use the `recipes/accelerate_configs/zero3.yaml` config and then overwrite `num_processes` to run on 7 devices:
+要通过GRPO训练器进行训练,我们使用一个GPU运行vLLM以加快生成速度,其余GPU用于训练。例如,在8个GPU的节点上,使用`recipes/accelerate_configs/zero3.yaml`配置,然后覆盖`num_processes`以在7个设备上运行:
 
 ```shell
 ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/zero3.yaml \
@@ -148,7 +178,7 @@ ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_con
     --config recipes/Qwen2.5-1.5B-Instruct/grpo/config_demo.yaml
 ```
 
-We provide a minimal reproducible experiment using GRPO for mathematical reasoning, referencing the approach from [SimpleRL-Reason](https://hkust-nlp.notion.site/simplerl-reason) which uses a 7B model trained on 8K examples. Running this on 8 H100 80G GPU takes about 3 hours:
+我们提供了一个使用GRPO进行数学推理的最小可复现实验,参考了[SimpleRL-Reason](https://hkust-nlp.notion.site/simplerl-reason)的方法,该方法使用在8K个示例上训练的7B模型。在8个H100 80G GPU上运行大约需要3小时:
 
 ```shell
 ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/zero2.yaml \
@@ -156,31 +186,31 @@ ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_con
     --config recipes/Qwen2.5-Math-7B/grpo/config_simple_rl.yaml
 ```
 
-Our final [model](https://huggingface.co/Dongwei/Qwen-2.5-7B_Base_Math_smalllr), while using different learning rates, loss functions and reward structures, achieves 69.4% accuracy on MATH-500, demonstrating a 17%+ improvement over the base model.
+我们的最终[模型](https://huggingface.co/Dongwei/Qwen-2.5-7B_Base_Math_smalllr),虽然使用了不同的学习率、损失函数和奖励结构,在MATH-500上达到了69.4%的准确率,相比基础模型提高了17%以上。
 
-### Launching jobs on a Slurm cluster
+### 在Slurm集群上启动作业
 
-If you have access to a Slurm cluster, we provide a `slurm/train.slurm` script that will automatically queue training jobs for you. Here's how you can use it:
+如果您可以访问Slurm集群,我们提供了一个`slurm/train.slurm`脚本,可以自动为您排队训练作业。以下是使用方法:
 
 ```shell
 sbatch --job-name=open_r1 --nodes=1 slurm/train.slurm {model_name} {task} {config_suffix} {accelerator}
 ```
 
-Here `{model_name}` and `{task}` are defined as above, while `{config_suffix}` refers to the specific config and `{accelerator}` refers to the choice of 🤗 Accelerate config in `recipes/accelerate_configs`. If you wish to override the default config parameters, you can provide them by appending a space-separated string like `'--arg1=value1 --arg2=value2'`. Here's a concrete example to run SFT on 1 node of 8 GPUs:
+这里`{model_name}`和`{task}`如上定义,而`{config_suffix}`指特定配置,`{accelerator}`指`recipes/accelerate_configs`中的🤗 Accelerate配置选择。如果您想覆盖默认配置参数,可以通过附加一个空格分隔的字符串,如`'--arg1=value1 --arg2=value2'`。以下是在1个节点8个GPU上运行SFT的具体示例:
 
 ```shell
-# Launch on Slurm and override default hyperparameters
+# 在Slurm上启动并覆盖默认超参数
 sbatch --job-name=open_r1 --nodes=1 slurm/train.slurm Qwen2.5-1.5B-Instruct sft demo zero3 '--per_device_train_batch_size=1 --num_train_epochs=5'
 ```
 
-You can scale the number of nodes by increasing the `--nodes` flag.
+您可以通过增加`--nodes`标志来扩展节点数量。
 
 > [!NOTE]
-> The configuration in `slurm/train.slurm` is optimised for the Hugging Face Compute Cluster and may require tweaking to be adapted to your own compute nodes.
+> `slurm/train.slurm`中的配置是为Hugging Face计算集群优化的,可能需要调整以适应您自己的计算节点。
 
-## Evaluating models
+## 评估模型
 
-We use `lighteval` to evaluate models, with custom tasks defined in `src/open_r1/evaluate.py`. For models which fit on a single GPU, run:
+我们使用`lighteval`来评估模型,在`src/open_r1/evaluate.py`中定义了自定义任务。对于适合单个GPU的模型,运行:
 
 ```shell
 MODEL=deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
@@ -210,9 +240,9 @@ lighteval vllm $MODEL_ARGS "custom|$TASK|0|0" \
 ```
 
 > [!IMPORTANT]
-> You must set `max_model_length=32768` in the `vllm` command to align with the `generation_size` we define per eval. Without this, `lighteval` will throw an error.
+> 您必须在`vllm`命令中设置`max_model_length=32768`以与我们为每个评估定义的`generation_size`对齐。否则,`lighteval`将抛出错误。
 
-To increase throughput across multiple GPUs, use _data parallel_ as follows:
+要在多个GPU上提高吞吐量,使用_数据并行_如下:
 
 ```shell
 NUM_GPUS=8
@@ -227,7 +257,7 @@ lighteval vllm $MODEL_ARGS "custom|$TASK|0|0" \
     --output-dir $OUTPUT_DIR 
 ```
 
-For large models which require sharding across GPUs, use _tensor parallel_ and run:
+对于需要在GPU之间分片的大型模型,使用_张量并行_并运行:
 
 ```shell
 NUM_GPUS=8
@@ -243,36 +273,36 @@ lighteval vllm $MODEL_ARGS "custom|$TASK|0|0" \
     --output-dir $OUTPUT_DIR 
 ```
 
-You can also launch an evaluation with `make evaluate`, specifying the model, task, and optionally the parallelism technique and number of GPUs.
+您也可以使用`make evaluate`启动评估,指定模型、任务,以及可选的并行技术和GPU数量。
 
-To evaluate on a single GPU:
+在单个GPU上评估:
 
 ```shell
 make evaluate MODEL=deepseek-ai/DeepSeek-R1-Distill-Qwen-32B TASK=aime24
 ```
 
-To use Data Parallelism:
+使用数据并行:
 
 ```shell
 make evaluate MODEL=deepseek-ai/DeepSeek-R1-Distill-Qwen-32B TASK=aime24 PARALLEL=data NUM_GPUS=8
 ```
 
-To use Tensor Parallelism:
+使用张量并行:
 
 ```shell
 make evaluate MODEL=deepseek-ai/DeepSeek-R1-Distill-Qwen-32B TASK=aime24 PARALLEL=tensor NUM_GPUS=8
 ```
 
-## Reproducing Deepseek's evaluation results
+## 复现Deepseek的评估结果
 
 > [!NOTE]
-> The DeepSeek-R1 paper uses sampling with a temperature of 0.6, a top-p value of 0.95, and 64 responses per query to estimate `pass@1`. Below, we report the results from greedy decoding, which likely explains the small 1-3σ discrepancies between our results and theirs.
+> DeepSeek-R1论文使用温度为0.6、top-p值为0.95的采样,每个查询64个响应来估计`pass@1`。以下我们报告的是贪婪解码的结果,这可能解释了我们的结果与他们的结果之间1-3σ的小差异。
 
 ### MATH-500
 
-We are able to reproduce Deepseek's reported results on the MATH-500 benchmark within ~1-3 standard deviations:
+我们能够在1-3个标准差内复现Deepseek在MATH-500基准测试上报告的结果:
 
-| Model                         | MATH-500 (🤗 LightEval) | MATH-500 (DeepSeek Reported) |
+| 模型                         | MATH-500 (🤗 LightEval) | MATH-500 (DeepSeek报告) |
 |:------------------------------|:-----------------------:|:----------------------------:|
 | DeepSeek-R1-Distill-Qwen-1.5B |          81.2           |             83.9             |
 | DeepSeek-R1-Distill-Qwen-7B   |          91.8           |             92.8             |
@@ -281,10 +311,10 @@ We are able to reproduce Deepseek's reported results on the MATH-500 benchmark w
 | DeepSeek-R1-Distill-Llama-8B  |          85.4           |             89.1             |
 | DeepSeek-R1-Distill-Llama-70B |          93.4           |             94.5             |
 
-To reproduce these results use the following command:
+要复现这些结果,使用以下命令:
 
 ```shell
-NUM_GPUS=1 # Set to 8 for 32B and 70B models
+NUM_GPUS=1 # 对于32B和70B模型设置为8
 MODEL=deepseek-ai/{model_name}
 MODEL_ARGS="pretrained=$MODEL,dtype=bfloat16,max_model_length=32768,gpu_memory_utilisation=0.8,tensor_parallel_size=$NUM_GPUS"
 OUTPUT_DIR=data/evals/$MODEL
@@ -295,7 +325,7 @@ lighteval vllm $MODEL_ARGS "custom|math_500|0|0" \
     --output-dir $OUTPUT_DIR
 ```
 
-Alternatively, you can launch Slurm jobs as follows:
+或者,您可以按如下方式启动Slurm作业:
 
 ```shell
 python scripts/run_benchmarks.py --model-id={model_id}  --benchmarks math_500
@@ -303,9 +333,9 @@ python scripts/run_benchmarks.py --model-id={model_id}  --benchmarks math_500
 
 ### GPQA Diamond
 
-We are able to reproduce Deepseek's reported results on the GPQA Diamond benchmark within ~1-3 standard deviations:
+我们能够在1-3个标准差内复现Deepseek在GPQA Diamond基准测试上报告的结果:
 
-| Model                         | GPQA Diamond (🤗 LightEval) | GPQA Diamond (DeepSeek Reported) |
+| 模型                         | GPQA Diamond (🤗 LightEval) | GPQA Diamond (DeepSeek报告) |
 |:------------------------------|:---------------------------:|:--------------------------------:|
 | DeepSeek-R1-Distill-Qwen-1.5B |            33.3             |               33.8               |
 | DeepSeek-R1-Distill-Qwen-7B   |            48.4             |               49.1               |
@@ -314,10 +344,10 @@ We are able to reproduce Deepseek's reported results on the GPQA Diamond benchma
 | DeepSeek-R1-Distill-Llama-8B  |            51.0             |               49.0               |
 | DeepSeek-R1-Distill-Llama-70B |            65.2             |               65.2               |
 
-To reproduce these results use the following command:
+要复现这些结果,使用以下命令:
 
 ```shell
-NUM_GPUS=1 # Set to 8 for 32B and 70B models
+NUM_GPUS=1 # 对于32B和70B模型设置为8
 MODEL=deepseek-ai/{model_name}
 MODEL_ARGS="pretrained=$MODEL,dtype=bfloat16,max_model_length=32768,gpu_memory_utilisation=0.8,tensor_parallel_size=$NUM_GPUS"
 OUTPUT_DIR=data/evals/$MODEL
@@ -332,18 +362,18 @@ lighteval vllm $MODEL_ARGS "custom|gpqa:diamond|0|0" \
 python scripts/run_benchmarks.py --model-id={model_id}  --benchmarks gpqa
 ```
 
-## Data generation
+## 数据生成
 
-### Generate data from a smol distilled R1 model
+### 从小型蒸馏R1模型生成数据
 
-The following example can be run in 1xH100. 
-First install the following dependencies:
+以下示例可以在1xH100上运行。
+首先安装以下依赖:
 
 ```shell
 uv pip install "distilabel[vllm]>=1.5.2"
 ```
 
-Now save the following snippet into a file named `pipeline.py` and run it with `python pipeline.py`. It will generate 4 outputs for each of the 10 examples (change the username for the repository to your org/user name):
+现在将以下代码片段保存到名为`pipeline.py`的文件中,并用`python pipeline.py`运行。它将为10个示例中的每一个生成4个输出(将仓库的用户名更改为您的组织/用户名):
 
 ```python
 from datasets import load_dataset
@@ -391,21 +421,20 @@ if __name__ == "__main__":
     distiset.push_to_hub(repo_id="username/numina-deepseek-r1-qwen-7b")
 ```
 
-Take a look at the sample dataset at [HuggingFaceH4/numina-deepseek-r1-qwen-7b](https://huggingface.co/datasets/HuggingFaceH4/numina-deepseek-r1-qwen-7b).
+查看[HuggingFaceH4/numina-deepseek-r1-qwen-7b](https://huggingface.co/datasets/HuggingFaceH4/numina-deepseek-r1-qwen-7b)的示例数据集。
 
+### 从DeepSeek-R1生成数据
 
-### Generate data from DeepSeek-R1
+要运行更大的DeepSeek-R1,我们使用了2个节点,每个节点有8×H100 GPU,使用本仓库中`slurm/generate.slurm`的slurm文件。首先,安装依赖项:
 
-To run the bigger DeepSeek-R1, we used 2 nodes, each with 8×H100 GPUs using the slurm file present in this repo at `slurm/generate.slurm`. First, install the dependencies:
-
-(for now we need to install the vllm dev wheel that [fixes the R1 cuda graph capture](https://github.com/vllm-project/vllm/commits/221d388cc5a836fa189305785ed7e887cea8b510/csrc/moe/moe_align_sum_kernels.cu))
+(目前我们需要安装[修复R1 cuda图捕获](https://github.com/vllm-project/vllm/commits/221d388cc5a836fa189305785ed7e887cea8b510/csrc/moe/moe_align_sum_kernels.cu)的vllm开发版轮子)
 ```shell
 pip install https://wheels.vllm.ai/221d388cc5a836fa189305785ed7e887cea8b510/vllm-1.0.0.dev-cp38-abi3-manylinux1_x86_64.whl --extra-index-url https://download.pytorch.org/whl/cu121
 
 uv pip install "distilabel[vllm,ray,openai]>=1.5.2"
 ```
 
-And then run the following command:
+然后运行以下命令:
 
 ```shell
 sbatch slurm/generate.slurm \
@@ -417,8 +446,8 @@ sbatch slurm/generate.slurm \
 ```
 
 > [!NOTE]  
-> While the job is running, you can setup an SSH tunnel through the cluster login node to access the Ray dashboard from your computer running `ssh -L 8265:ray_ip_head_node:8265 <login_node>`, then browsing `http://localhost:8265`
+> 在作业运行时,您可以通过集群登录节点设置SSH隧道来从您的计算机访问Ray仪表板,运行`ssh -L 8265:ray_ip_head_node:8265 <login_node>`,然后浏览`http://localhost:8265`
 
-## Contributing
+## 贡献
 
-Contributions are welcome. Please refer to https://github.com/huggingface/open-r1/issues/23.
+欢迎贡献。请参考 https://github.com/huggingface/open-r1/issues/23。
